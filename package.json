@@ -1,0 +1,74 @@
+{
+  "name": "sonido",
+  "productName": "Sonido",
+  "version": "1.0.0",
+  "description": "Sonido Radio webchat (BoxyChat) als desktop-app voor Windows en Linux, met webcam-ondersteuning.",
+  "main": "src/index.js",
+  "author": {
+    "name": "AccessWebBE (Jellis Onsea)",
+    "email": "jellis@accessweb.be",
+    "url": "https://github.com/AccessWebBE"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/AccessWebBE/SonidoRadio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AccessWebBE/SonidoRadio.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir --publish never",
+    "dist": "electron-builder --publish always",
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "be.accessweb.sonido",
+    "productName": "Sonido",
+    "copyright": "Copyright © 2026 Sonido Radio",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Sonido-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sonido"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "maintainer": "AccessWebBE <jellis@accessweb.be>",
+      "synopsis": "Sonido Radio webchat",
+      "description": "Desktop-app voor de Sonido Radio webchat (BoxyChat) met webcam-ondersteuning.",
+      "artifactName": "Sonido-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AccessWebBE",
+        "repo": "SonidoRadio"
+      }
+    ]
+  }
+}
