@@ -63,6 +63,9 @@ Ja. De app is open source (je kunt alle code hieronder inkijken), opent enkel de
 **Waarom die waarschuwing bij het installeren op Windows?**
 Omdat de app nog niet "code-signed" is. Dat is een (betalende/aan te vragen) digitale handtekening die we later toevoegen. Zolang je downloadt van de officiële downloadpagina hierboven, zit je goed.
 
+**Hoe krijg ik updates?**
+Sonido controleert automatisch op nieuwe officiële releases. Zodra een update klaarstaat, kun je meteen herstarten of ze automatisch laten installeren wanneer je de app afsluit. De gewone Windows-installer werkt ook als upgrade en behoudt je bestaande installatie.
+
 **Kost het iets?**
 Nee, helemaal gratis.
 
