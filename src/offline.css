@@ -14,6 +14,7 @@ body {
   margin: 0;
   display: grid;
   place-items: center;
+  border-top: 4px solid #a41118;
   background: #0f0a1a;
 }
 
@@ -22,9 +23,22 @@ main {
   text-align: center;
 }
 
-img {
+.brand {
+  margin-bottom: 24px;
+}
+
+.brand img {
   display: block;
-  margin: 0 auto 24px;
+  margin: 0 auto 10px;
+}
+
+.brand p {
+  margin: 0;
+  color: #c9c4df;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 h1 {
@@ -58,4 +72,58 @@ a {
 a:focus-visible {
   outline: 3px solid #ffffff;
   outline-offset: 3px;
+}
+
+.signal {
+  height: 30px;
+  margin-top: 38px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+}
+
+.signal span {
+  width: 5px;
+  border-radius: 2px;
+  background: #5472ff;
+  animation: search 1.2s ease-in-out infinite alternate;
+}
+
+.signal span:nth-child(1) {
+  height: 8px;
+}
+
+.signal span:nth-child(2) {
+  height: 15px;
+  animation-delay: 160ms;
+}
+
+.signal span:nth-child(3) {
+  height: 22px;
+  background: #dc3c42;
+  animation-delay: 320ms;
+}
+
+.signal span:nth-child(4) {
+  height: 29px;
+  background: #dc3c42;
+  animation-delay: 480ms;
+}
+
+@keyframes search {
+  from {
+    opacity: 0.3;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal span {
+    animation: none;
+  }
 }

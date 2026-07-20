@@ -12,9 +12,12 @@ const { configureAutoUpdates } = require('./updater');
 
 const APP_ID = 'be.accessweb.sonido';
 const ERROR_PAGE = path.join(__dirname, 'index.html');
+const SPLASH_PAGE = path.join(__dirname, 'splash.html');
 const FORCE_CLOSE_DELAY_MS = 3_000;
+const MAX_SPLASH_DURATION_MS = 10_000;
 
 let mainWindow = null;
+let splashWindow = null;
 let showingConnectionError = false;
 
 app.setAppUserModelId(APP_ID);
@@ -114,7 +117,39 @@ const configureClosing = (window) => {
   });
 };
 
+const createSplashWindow = () => {
+  const window = new BrowserWindow({
+    width: 440,
+    height: 320,
+    center: true,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    backgroundColor: '#0b0810',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  splashWindow = window;
+  window.on('closed', () => {
+    if (splashWindow === window) {
+      splashWindow = null;
+    }
+  });
+  window.loadFile(SPLASH_PAGE).catch((error) => {
+    console.error('Kon het startscherm niet laden:', error);
+  });
+
+  return window;
+};
+
 const createWindow = () => {
+  const splash = createSplashWindow();
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -136,12 +171,36 @@ const createWindow = () => {
   configureNavigation(window);
   configurePermissions(window.webContents.session);
 
-  window.once('ready-to-show', () => {
-    window.maximize();
-    window.show();
-  });
+  let revealTimer = null;
+  const revealWindow = () => {
+    if (window.isDestroyed()) {
+      return;
+    }
+
+    if (revealTimer) {
+      clearTimeout(revealTimer);
+      revealTimer = null;
+    }
+    if (!window.isVisible()) {
+      window.maximize();
+      window.show();
+    }
+    if (!splash.isDestroyed()) {
+      splash.destroy();
+    }
+  };
+
+  window.once('ready-to-show', revealWindow);
+  revealTimer = setTimeout(revealWindow, MAX_SPLASH_DURATION_MS);
+  revealTimer.unref();
 
   window.on('closed', () => {
+    if (revealTimer) {
+      clearTimeout(revealTimer);
+    }
+    if (!splash.isDestroyed()) {
+      splash.destroy();
+    }
     if (mainWindow === window) {
       mainWindow = null;
     }
@@ -159,6 +218,9 @@ const focusMainWindow = () => {
 
   if (mainWindow.isMinimized()) {
     mainWindow.restore();
+  }
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.destroy();
   }
   mainWindow.show();
   mainWindow.focus();

@@ -2,7 +2,7 @@
   "name": "sonido",
   "productName": "Sonido",
   "desktopName": "be.accessweb.sonido",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Sonido Radio WebChat als desktop-app voor Windows en Linux, met webcam-ondersteuning (chat op BoxyChat / chattersnet.nl).",
   "main": "src/index.js",
   "author": {
