@@ -10,13 +10,15 @@ const {
   isSafeExternalUrl,
 } = require('./policies');
 const { configureContextMenu } = require('./context-menu');
+const { createRevealScheduler } = require('./reveal');
 const { configureAutoUpdates } = require('./updater');
 
 const APP_ID = 'be.accessweb.sonido';
 const ERROR_PAGE = path.join(__dirname, 'index.html');
 const SPLASH_PAGE = path.join(__dirname, 'splash.html');
 const FORCE_CLOSE_DELAY_MS = 3_000;
-const MAX_SPLASH_DURATION_MS = 10_000;
+const MIN_SPLASH_DURATION_MS = 1_000;
+const MAX_SPLASH_DURATION_MS = 4_000;
 
 let mainWindow = null;
 let splashWindow = null;
@@ -179,16 +181,11 @@ const createWindow = () => {
   configureContextMenu(window, { Menu, clipboard, openExternal });
   configurePermissions(window.webContents.session);
 
-  let revealTimer = null;
   const revealWindow = () => {
     if (window.isDestroyed()) {
       return;
     }
 
-    if (revealTimer) {
-      clearTimeout(revealTimer);
-      revealTimer = null;
-    }
     if (!window.isVisible()) {
       window.maximize();
       window.show();
@@ -198,14 +195,17 @@ const createWindow = () => {
     }
   };
 
-  window.once('ready-to-show', revealWindow);
-  revealTimer = setTimeout(revealWindow, MAX_SPLASH_DURATION_MS);
-  revealTimer.unref();
+  const reveal = createRevealScheduler({
+    minDelayMs: MIN_SPLASH_DURATION_MS,
+    maxDelayMs: MAX_SPLASH_DURATION_MS,
+    reveal: revealWindow,
+  });
+
+  window.once('ready-to-show', reveal.request);
+  window.webContents.once('did-finish-load', reveal.request);
 
   window.on('closed', () => {
-    if (revealTimer) {
-      clearTimeout(revealTimer);
-    }
+    reveal.cancel();
     if (!splash.isDestroyed()) {
       splash.destroy();
     }
