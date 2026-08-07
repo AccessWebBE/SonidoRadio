@@ -57,6 +57,9 @@ Ja — dat is nu net waarvoor deze app bestaat. 📹
 **En mijn microfoon?**
 Nee, die staat bewust uit. Sonido is een radio, dus de chat gebruikt geen microfoons.
 
+**Kan ik kopiëren en plakken?**
+Ja. Rechtsklik in het chatvenster geeft een menu met **Knippen, Kopiëren, Plakken, Ongedaan maken** en **Alles selecteren**. Rechtsklik je op een link, dan kun je die ook kopiëren of in je browser openen. De sneltoetsen `Ctrl+C`, `Ctrl+V` en `Ctrl+X` werken uiteraard ook.
+
 **Is het veilig?**
 Ja. De app is open source (je kunt alle code hieronder inkijken), opent enkel de Sonido Radio-chat, en geeft enkel je camera vrij — verder niks (geen locatie, geen meldingen, geen scherm delen).
 
@@ -75,6 +78,7 @@ Nee, helemaal gratis.
 
 - 📹 **Webcam werkt** — meteen, zonder browser-gedoe.
 - 🔇 **Geen microfoon** — bewust uitgeschakeld.
+- 📋 **Rechtsklik-menu** — kopiëren, plakken en knippen zoals je gewend bent.
 - 🔒 **Enkel de chat** — alleen `*.chattersnet.nl` mag je camera; al de rest wordt geweigerd.
 - 🪶 **Licht & simpel** — één venster, native op Windows en Linux.
 - 💸 **Gratis & open source.**

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, clipboard, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const {
@@ -8,6 +8,7 @@ const {
   isCameraRequest,
   isSafeExternalUrl,
 } = require('./policies');
+const { configureContextMenu } = require('./context-menu');
 const { configureAutoUpdates } = require('./updater');
 
 const APP_ID = 'be.accessweb.sonido';
@@ -169,6 +170,7 @@ const createWindow = () => {
   mainWindow = window;
   configureClosing(window);
   configureNavigation(window);
+  configureContextMenu(window, { Menu, clipboard, openExternal });
   configurePermissions(window.webContents.session);
 
   let revealTimer = null;
