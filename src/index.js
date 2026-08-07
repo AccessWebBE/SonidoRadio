@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, clipboard, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const log = require('electron-log/main');
 const path = require('path');
 const {
   CHAT_URL,
@@ -22,6 +23,11 @@ let splashWindow = null;
 let showingConnectionError = false;
 
 app.setAppUserModelId(APP_ID);
+
+// Een GUI-app heeft geen console, dus zonder logbestand is een stille
+// updaterfout nergens terug te vinden.
+log.transports.file.level = 'info';
+log.info(`Sonido ${app.getVersion()} gestart op ${process.platform}`);
 
 const openExternal = (url) => {
   if (!isSafeExternalUrl(url)) {
@@ -240,6 +246,7 @@ if (!app.requestSingleInstanceLock()) {
       autoUpdater,
       dialog,
       getMainWindow: () => mainWindow,
+      logger: log,
     });
   });
 

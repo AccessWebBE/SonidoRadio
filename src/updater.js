@@ -1,11 +1,13 @@
-const INITIAL_UPDATE_DELAY_MS = 10_000;
+const INITIAL_UPDATE_DELAY_MS = 3_000;
 const UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1_000;
+const PROGRESS_HIDDEN = -1;
 
 const configureAutoUpdates = ({
   app,
   autoUpdater,
   dialog,
   getMainWindow,
+  logger = null,
   setTimeoutFn = setTimeout,
   setIntervalFn = setInterval,
 }) => {
@@ -15,14 +17,51 @@ const configureAutoUpdates = ({
 
   let updatePromptOpen = false;
 
+  if (logger) {
+    autoUpdater.logger = logger;
+  }
+
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  // De melding komt pas als de download klaar is. Zonder teken van leven lijkt
+  // het alsof er niets gebeurt, dus tonen we de voortgang in taakbalk en dock.
+  const showProgress = (value, mode) => {
+    const window = getMainWindow();
+    if (!window || window.isDestroyed() || typeof window.setProgressBar !== 'function') {
+      return;
+    }
+
+    if (mode) {
+      window.setProgressBar(value, { mode });
+    } else {
+      window.setProgressBar(value);
+    }
+  };
+
+  autoUpdater.on('update-available', () => {
+    showProgress(0, 'indeterminate');
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    showProgress(PROGRESS_HIDDEN);
+  });
+
+  autoUpdater.on('download-progress', ({ percent } = {}) => {
+    const fraction = Number(percent) / 100;
+    if (Number.isFinite(fraction)) {
+      showProgress(Math.min(Math.max(fraction, 0), 1));
+    }
+  });
+
   autoUpdater.on('error', (error) => {
+    showProgress(PROGRESS_HIDDEN);
     console.error('Automatische update mislukt:', error);
   });
 
   autoUpdater.on('update-downloaded', async (updateInfo) => {
+    showProgress(PROGRESS_HIDDEN);
+
     if (updatePromptOpen) {
       return;
     }
