@@ -1,5 +1,6 @@
 const CHAT_URL = 'https://boxy.chattersnet.nl/chatbox/sonidoradio';
-const CHAT_HOSTS = new Set(['boxy.chattersnet.nl', 'chameleon.chattersnet.nl']);
+// chameleon.chattersnet.nl is voor deze chat vervallen (webcam is native) en verdwijnt eind 2026.
+const CHAT_HOSTS = new Set(['boxy.chattersnet.nl']);
 const EXTERNAL_PROTOCOLS = new Set(['https:', 'http:', 'mailto:']);
 
 const parseUrl = (value) => {

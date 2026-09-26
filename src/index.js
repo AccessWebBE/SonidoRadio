@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, clipboard, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, clipboard, dialog, safeStorage, shell, webFrameMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log/main');
+const fs = require('fs');
 const path = require('path');
 const {
   CHAT_URL,
@@ -10,6 +11,7 @@ const {
   isSafeExternalUrl,
 } = require('./policies');
 const { configureContextMenu } = require('./context-menu');
+const { buildLoginScript, createLoginMemory, isLoginFrameUrl } = require('./login-memory');
 const { createRevealScheduler } = require('./reveal');
 const { configureAutoUpdates } = require('./updater');
 
@@ -98,6 +100,80 @@ const configureNavigation = (window) => {
   );
 };
 
+let loginMemory = null;
+const getLoginMemory = () => {
+  if (!loginMemory) {
+    loginMemory = createLoginMemory({
+      file: path.join(app.getPath('userData'), 'login.json'),
+      fs,
+      path,
+      safeStorage,
+      platform: process.platform,
+    });
+  }
+  return loginMemory;
+};
+
+const askToRememberPassword = async (window, nick, isUpdate) => {
+  const { response } = await dialog.showMessageBox(window, {
+    type: 'question',
+    buttons: ['Onthouden', 'Niet nu', 'Nooit'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+    title: 'Wachtwoord onthouden?',
+    message: isUpdate ? `Opgeslagen wachtwoord voor ${nick} bijwerken?` : `Wachtwoord voor ${nick} onthouden?`,
+    detail:
+      'Sonido bewaart het versleuteld op deze computer en vult het de volgende keer zelf in. ' +
+      'Vergeten kan altijd via rechtsklik → "Opgeslagen nickname en wachtwoord vergeten".',
+  });
+  return response;
+};
+
+// Wat er in het welkomstscherm verstuurd werd: de nickname altijd onthouden (zoals een browser),
+// het wachtwoord alleen na een ja — en nooit als er geen veilige opslag is.
+const handleLogin = async (window, result) => {
+  if (!result || result.status !== 'submitted' || !result.nick) {
+    return;
+  }
+  const memory = getLoginMemory();
+  memory.rememberNick(result.nick);
+  if (!result.password || !memory.canStorePassword() || window.isDestroyed()) {
+    return;
+  }
+  const saved = memory.load();
+  if (saved.password === result.password || saved.passwordChoice === 'never') {
+    return;
+  }
+  const response = await askToRememberPassword(window, result.nick, Boolean(saved.password));
+  if (response === 0) {
+    memory.rememberPassword(result.password);
+  } else if (response === 2) {
+    memory.setPasswordChoice('never');
+  }
+};
+
+// De chat (KiwiIRC in een iframe) onthoudt zelf niets en een browser vult hem in met zijn wachtwoordbeheerder;
+// Electron heeft die niet. Dus: zodra het chatframe geladen is, vullen we het welkomstformulier zelf in.
+const configureLoginMemory = (window) => {
+  window.webContents.on('did-frame-finish-load', (_event, isMainFrame, frameProcessId, frameRoutingId) => {
+    if (isMainFrame) {
+      return;
+    }
+    const frame = webFrameMain.fromId(frameProcessId, frameRoutingId);
+    if (!frame || !isLoginFrameUrl(frame.url)) {
+      return;
+    }
+    frame
+      .executeJavaScript(buildLoginScript(getLoginMemory().load()))
+      .then((result) => handleLogin(window, result))
+      .catch((error) => {
+        // bewust zonder de foutmelding zelf: het script bevat eventueel het wachtwoord
+        log.warn(`Aanmeldgegevens invullen lukte niet (${error && error.name})`);
+      });
+  });
+};
+
 const configureClosing = (window) => {
   let forceCloseTimer = null;
 
@@ -178,7 +254,17 @@ const createWindow = () => {
   mainWindow = window;
   configureClosing(window);
   configureNavigation(window);
-  configureContextMenu(window, { Menu, clipboard, openExternal });
+  configureContextMenu(window, {
+    Menu,
+    clipboard,
+    openExternal,
+    login: {
+      getState: () => getLoginMemory().menuState(),
+      setAutoConnect: (value) => getLoginMemory().setAutoConnect(value),
+      forget: () => getLoginMemory().forget(),
+    },
+  });
+  configureLoginMemory(window);
   configurePermissions(window.webContents.session);
 
   const revealWindow = () => {

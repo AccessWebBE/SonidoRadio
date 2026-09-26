@@ -9,7 +9,7 @@ const {
 
 test('staat alleen HTTPS-navigatie op de exacte chat-hosts toe', () => {
   assert.equal(isAllowedChatUrl('https://boxy.chattersnet.nl/chatbox/sonidoradio'), true);
-  assert.equal(isAllowedChatUrl('https://chameleon.chattersnet.nl/'), true);
+  assert.equal(isAllowedChatUrl('https://chameleon.chattersnet.nl/'), false, 'chameleon is vervallen');
   assert.equal(isAllowedChatUrl('http://boxy.chattersnet.nl/'), false);
   assert.equal(isAllowedChatUrl('https://evil.boxy.chattersnet.nl/'), false);
   assert.equal(isAllowedChatUrl('geen-url'), false);

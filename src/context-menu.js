@@ -23,7 +23,8 @@ const trimSeparators = (items) => {
   return trimmed;
 };
 
-const buildContextMenuTemplate = (params = {}) => {
+// login: { autoConnect, hasSaved } — de onthouden aanmeldgegevens (zie login-memory.js); weglaten = geen items.
+const buildContextMenuTemplate = (params = {}, login = null) => {
   const editFlags = params.editFlags || {};
   const hasSelection = Boolean((params.selectionText || '').trim());
   const items = [];
@@ -76,11 +77,32 @@ const buildContextMenuTemplate = (params = {}) => {
     enabled: flag(editFlags.canSelectAll, true),
   });
 
+  if (login) {
+    items.push(
+      SEPARATOR,
+      {
+        id: 'auto-connect',
+        type: 'checkbox',
+        label: 'Automatisch verbinden',
+        checked: Boolean(login.autoConnect),
+      },
+      {
+        id: 'forget-login',
+        label: 'Opgeslagen nickname en wachtwoord vergeten',
+        enabled: Boolean(login.hasSaved),
+      },
+    );
+  }
+
   return trimSeparators(items);
 };
 
-const createClickHandler = (id, params, { clipboard, openExternal }) => {
+const createClickHandler = (id, params, { clipboard, openExternal, login }) => {
   switch (id) {
+    case 'auto-connect':
+      return login ? (menuItem) => login.setAutoConnect(menuItem.checked) : null;
+    case 'forget-login':
+      return login ? () => login.forget() : null;
     case 'open-link':
       return () => openExternal(params.linkURL);
     case 'copy-link':
@@ -92,26 +114,28 @@ const createClickHandler = (id, params, { clipboard, openExternal }) => {
   }
 };
 
-const toMenuItems = (template, params, { clipboard, openExternal }) =>
+const toMenuItems = (template, params, { clipboard, openExternal, login }) =>
   template.map((item) => {
     if (item.type === 'separator') {
       return { type: 'separator' };
     }
 
     const { id, ...menuItem } = item;
-    const click = createClickHandler(id, params, { clipboard, openExternal });
+    const click = createClickHandler(id, params, { clipboard, openExternal, login });
     return click ? { ...menuItem, click } : menuItem;
   });
 
-const configureContextMenu = (window, { Menu, clipboard, openExternal }) => {
+// login (optioneel): { getState() → { autoConnect, hasSaved }, setAutoConnect(bool), forget() }
+const configureContextMenu = (window, { Menu, clipboard, openExternal, login }) => {
   window.webContents.on('context-menu', (_event, params) => {
     if (window.isDestroyed()) {
       return;
     }
 
-    const template = toMenuItems(buildContextMenuTemplate(params), params, {
+    const template = toMenuItems(buildContextMenuTemplate(params, login ? login.getState() : null), params, {
       clipboard,
       openExternal,
+      login,
     });
 
     if (template.length === 0) {

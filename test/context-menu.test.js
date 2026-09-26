@@ -114,3 +114,22 @@ test('koppelt klik-acties aan de link- en afbeeldingsitems', () => {
   assert.ok(items.some((item) => item.type === 'separator'));
   assert.ok(items.every((item) => item.id === undefined));
 });
+
+test('toont de aanmelditems alleen als de app ze aanlevert', () => {
+  assert.equal(idsOf(buildContextMenuTemplate({})).includes('auto-connect'), false);
+  const met = buildContextMenuTemplate({}, { autoConnect: true, hasSaved: false });
+  assert.deepEqual(idsOf(met).slice(-2), ['auto-connect', 'forget-login']);
+  assert.equal(find(met, 'auto-connect').type, 'checkbox');
+  assert.equal(find(met, 'auto-connect').checked, true);
+  assert.equal(find(met, 'forget-login').enabled, false, 'niets opgeslagen: vergeten uitgeschakeld');
+});
+
+test('de aanmelditems roepen de juiste acties aan', () => {
+  const gedaan = [];
+  const login = { setAutoConnect: (v) => gedaan.push(['auto', v]), forget: () => gedaan.push(['vergeten']) };
+  const template = buildContextMenuTemplate({}, { autoConnect: false, hasSaved: true });
+  const items = toMenuItems(template, {}, { clipboard: {}, openExternal: () => {}, login });
+  items.find((i) => i.label === 'Automatisch verbinden').click({ checked: true });
+  items.find((i) => i.label === 'Opgeslagen nickname en wachtwoord vergeten').click();
+  assert.deepEqual(gedaan, [['auto', true], ['vergeten']]);
+});
