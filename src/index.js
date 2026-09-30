@@ -12,6 +12,7 @@ const {
 } = require('./policies');
 const { configureContextMenu } = require('./context-menu');
 const { buildLoginScript, createLoginMemory, isLoginFrameUrl } = require('./login-memory');
+const { buildVolumeScript, isPlayerPageUrl } = require('./player-volume');
 const { createRevealScheduler } = require('./reveal');
 const { configureAutoUpdates } = require('./updater');
 
@@ -174,6 +175,26 @@ const configureLoginMemory = (window) => {
   });
 };
 
+// De volumebalk van de radiospeler bewaart zelf niets; na een herstart stond het volume weer op de beginwaarde.
+// Dit script bewaart elke wijziging waar de speler bij het starten zelf kijkt.
+const configurePlayerVolume = (window) => {
+  window.webContents.on('did-finish-load', () => {
+    if (!isPlayerPageUrl(window.webContents.getURL())) {
+      return;
+    }
+    window.webContents
+      .executeJavaScript(buildVolumeScript())
+      .then((result) => {
+        if (result === 'geen-chatbox') {
+          log.warn('Volume onthouden: geen chatbox gevonden op de pagina');
+        }
+      })
+      .catch((error) => {
+        log.warn(`Volume onthouden lukte niet (${error && error.message})`);
+      });
+  });
+};
+
 const configureClosing = (window) => {
   let forceCloseTimer = null;
 
@@ -185,6 +206,13 @@ const configureClosing = (window) => {
   window.on('close', () => {
     if (forceCloseTimer) {
       return;
+    }
+
+    // localStorage (onder meer het volume van de radio) gaat met vertraging naar schijf: nu meteen wegschrijven
+    try {
+      window.webContents.session.flushStorageData();
+    } catch (error) {
+      log.warn(`Opslag wegschrijven bij het sluiten lukte niet (${error && error.message})`);
     }
 
     forceCloseTimer = setTimeout(() => {
@@ -265,6 +293,7 @@ const createWindow = () => {
     },
   });
   configureLoginMemory(window);
+  configurePlayerVolume(window);
   configurePermissions(window.webContents.session);
 
   const revealWindow = () => {

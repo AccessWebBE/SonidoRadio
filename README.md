@@ -69,6 +69,9 @@ Omdat de app nog niet "code-signed" is. Dat is een (betalende/aan te vragen) dig
 **Moet ik elke keer mijn nickname opnieuw typen?**
 Nee. Sonido onthoudt je nickname en vult hem de volgende keer zelf in. Gebruik je een wachtwoord, dan vraagt Sonido één keer of het dat ook mag onthouden — het wordt dan **versleuteld** op je computer bewaard (op Windows met je Windows-account, op Linux in KWallet of de GNOME-sleutelbos). Wil je dat Sonido meteen verbindt zonder op *Start met chatten* te drukken? Rechtsklik → **Automatisch verbinden**. Alles vergeten kan via rechtsklik → **Opgeslagen nickname en wachtwoord vergeten**.
 
+**Onthoudt Sonido het volume van de radio?**
+Ja. Het volume dat je in de speler instelt, staat bij de volgende start weer zo. Dempen onthoudt Sonido bewust niet, anders start de radio de volgende keer zonder geluid.
+
 **Hoe krijg ik updates?**
 Sonido controleert automatisch op nieuwe officiële releases, een paar seconden na het opstarten. Terwijl de update binnenkomt zie je de voortgang in je taakbalk. Zodra ze klaarstaat, kun je meteen herstarten of ze automatisch laten installeren wanneer je de app afsluit. De gewone Windows-installer werkt ook als upgrade en behoudt je bestaande installatie.
 
@@ -83,6 +86,7 @@ Nee, helemaal gratis.
 - 🔇 **Geen microfoon** — bewust uitgeschakeld.
 - 📋 **Rechtsklik-menu** — kopiëren, plakken en knippen zoals je gewend bent.
 - 🔑 **Onthoudt je nickname** — en desgewenst je wachtwoord, versleuteld.
+- 🔊 **Onthoudt je volume** — de radio start op het volume dat je het laatst koos.
 - 🔒 **Enkel de chat** — alleen `boxy.chattersnet.nl` mag je camera; al de rest wordt geweigerd.
 - 🪶 **Licht & simpel** — één venster, native op Windows en Linux.
 - 💸 **Gratis & open source.**
