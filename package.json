@@ -2,7 +2,7 @@
   "name": "sonido",
   "productName": "Sonido",
   "desktopName": "be.accessweb.sonido",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Sonido Radio WebChat als desktop-app voor Windows en Linux, met webcam-ondersteuning (chat op BoxyChat / chattersnet.nl).",
   "main": "src/index.js",
   "author": {
@@ -25,8 +25,8 @@
     "dist:win": "electron-builder --win --publish never"
   },
   "devDependencies": {
-    "electron": "^43.7.7",
-    "electron-builder": "^26.15.3"
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "be.accessweb.sonido",
@@ -78,6 +78,6 @@
   },
   "dependencies": {
     "electron-log": "^5.4.4",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.11"
   }
 }

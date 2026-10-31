@@ -6,21 +6,46 @@ const path = require('path');
 const vm = require('vm');
 const { buildLoginScript, createLoginMemory, isLoginFrameUrl } = require('../src/login-memory');
 
-// safeStorage zoals Electron hem aanbiedt, met een zichtbaar "versleuteld" formaat
-const fakeSafeStorage = ({ available = true, backend = 'kwallet6', failDecrypt = false } = {}) => {
-  const calls = { decrypt: 0 };
-  return {
+// safeStorage zoals Electron 45 hem aanbiedt. Twee formaten, zoals gemeten op 31-10-2026 (KWallet 6): wat de
+// asynchrone functies versleutelen ("async:") en wat 1.2.0/1.2.1 met de synchrone encryptString bewaarde ("oud:").
+// decryptStringAsync leest het oude formaat NIET; alleen de (afgeschreven) synchrone decryptString doet dat.
+const fakeSafeStorage = ({ available = true, backend = 'kwallet6', failDecrypt = false, reEncrypt = false, electron46 = false } = {}) => {
+  const calls = { decrypt: 0, encrypt: 0, sync: 0 };
+  const afgeschreven = () => {
+    throw new Error('synchrone safeStorage is afgeschreven (Electron 45) en weg in 46');
+  };
+  const decode = (buffer, prefix) => {
+    const tekst = buffer.toString();
+    if (!tekst.startsWith(prefix)) throw new Error('Error while decrypting the ciphertext');
+    return Buffer.from(tekst.slice(prefix.length), 'hex').toString();
+  };
+  const nep = {
     calls,
-    isEncryptionAvailable: () => available,
-    getSelectedStorageBackend: () => backend,
-    encryptString: (text) => Buffer.from(`geheim:${Buffer.from(text).toString('hex')}`),
+    isEncryptionAvailable: afgeschreven,
+    encryptString: afgeschreven,
     decryptString: (buffer) => {
+      calls.sync += 1;
+      return decode(buffer, 'oud:');
+    },
+    isAsyncEncryptionAvailable: async () => available,
+    getSelectedStorageBackend: () => backend,
+    encryptStringAsync: async (text) => {
+      calls.encrypt += 1;
+      return Buffer.from(`async:${Buffer.from(text).toString('hex')}`);
+    },
+    decryptStringAsync: async (buffer) => {
       calls.decrypt += 1;
       if (failDecrypt) throw new Error('andere sleutelbos');
-      return Buffer.from(buffer.toString().replace('geheim:', ''), 'hex').toString();
+      return { result: decode(buffer, 'async:'), shouldReEncrypt: reEncrypt };
     },
   };
+  if (electron46) delete nep.decryptString;
+  return nep;
 };
+
+// een login.json zoals Sonido 1.2.0/1.2.1 hem achterliet
+const oudBestand = (file, password) =>
+  fs.writeFileSync(file, JSON.stringify({ nick: 'Jellis', password: Buffer.from(`oud:${Buffer.from(password).toString('hex')}`).toString('base64') }));
 
 const newMemory = (options = {}) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sonido-login-'));
@@ -38,65 +63,110 @@ test('herkent alleen het KiwiIRC-chatframe', () => {
   assert.equal(isLoginFrameUrl('https://www.google.com/recaptcha/api2/anchor'), false);
 });
 
-test('onthoudt de nickname, zonder spaties rond', () => {
+test('onthoudt de nickname, zonder spaties rond', async () => {
   const { memory } = newMemory();
-  assert.equal(memory.load().nick, '');
+  assert.equal((await memory.load()).nick, '');
   memory.rememberNick('  Jellis  ');
-  assert.equal(memory.load().nick, 'Jellis');
+  assert.equal((await memory.load()).nick, 'Jellis');
   memory.rememberNick('   ');
-  assert.equal(memory.load().nick, 'Jellis', 'een lege nickname wist niets');
+  assert.equal((await memory.load()).nick, 'Jellis', 'een lege nickname wist niets');
 });
 
-test('bewaart het wachtwoord alleen versleuteld', () => {
+test('bewaart het wachtwoord alleen versleuteld', async () => {
   const { memory, file } = newMemory();
-  assert.equal(memory.rememberPassword('Zeer$Geheim1'), true);
+  assert.equal(await memory.rememberPassword('Zeer$Geheim1'), true);
   const opSchijf = fs.readFileSync(file, 'utf8');
   assert.equal(opSchijf.includes('Zeer$Geheim1'), false, 'het wachtwoord mag nooit leesbaar op schijf staan');
-  assert.equal(memory.load().password, 'Zeer$Geheim1');
+  assert.equal((await memory.load()).password, 'Zeer$Geheim1');
   if (process.platform !== 'win32') {
     assert.equal(fs.statSync(file).mode & 0o777, 0o600, 'alleen leesbaar voor de gebruiker');
   }
 });
 
-test('geen wachtwoord zonder echte sleutelbos (Linux basic_text)', () => {
+test('geen wachtwoord zonder echte sleutelbos (Linux basic_text)', async () => {
   const { memory } = newMemory({ backend: 'basic_text' });
-  assert.equal(memory.canStorePassword(), false);
-  assert.equal(memory.rememberPassword('x'), false);
-  assert.equal(memory.load().password, '');
+  assert.equal(await memory.canStorePassword(), false);
+  assert.equal(await memory.rememberPassword('x'), false);
+  assert.equal((await memory.load()).password, '');
   const windows = newMemory({ backend: 'basic_text', platform: 'win32' });
-  assert.equal(windows.memory.canStorePassword(), true, 'op Windows beschermt DPAPI; de backendvraag is Linux-specifiek');
+  assert.equal(await windows.memory.canStorePassword(), true, 'op Windows beschermt DPAPI; de backendvraag is Linux-specifiek');
+  const geen = newMemory({ available: false, platform: 'win32' });
+  assert.equal(await geen.memory.canStorePassword(), false, 'geen versleuteling beschikbaar: niets bewaren');
 });
 
-test('een wachtwoord dat niet te ontsleutelen is, wordt gewoon opnieuw gevraagd', () => {
+test('een wachtwoord dat niet te ontsleutelen is, wordt gewoon opnieuw gevraagd', async () => {
   const { memory } = newMemory({ failDecrypt: true });
-  memory.rememberPassword('x');
-  assert.equal(memory.load().password, '');
+  await memory.rememberPassword('x');
+  assert.equal((await memory.load()).password, '');
 });
 
-test('vergeten wist nickname en wachtwoord, maar niet de voorkeur voor automatisch verbinden', () => {
+test('een vernieuwde sleutel: het wachtwoord wordt opnieuw versleuteld bewaard (shouldReEncrypt)', async () => {
+  const { memory, file, safeStorage } = newMemory({ reEncrypt: true });
+  await memory.rememberPassword('Geheim2');
+  const voor = safeStorage.calls.encrypt;
+  assert.equal((await memory.load()).password, 'Geheim2');
+  assert.equal(safeStorage.calls.encrypt, voor + 1, 'na shouldReEncrypt opnieuw versleutelen');
+  assert.equal(fs.readFileSync(file, 'utf8').includes('Geheim2'), false);
+});
+
+test('de gewone weg gebruikt nooit de afgeschreven synchrone safeStorage', async () => {
+  const { memory, safeStorage } = newMemory();
+  memory.rememberNick('Jellis');
+  await memory.rememberPassword('x');
+  assert.equal((await memory.load()).password, 'x');
+  memory.menuState();
+  memory.forget();
+  assert.equal(safeStorage.calls.sync, 0);
+});
+
+test('een wachtwoord van 1.2.0/1.2.1 wordt één keer omgezet naar het nieuwe formaat', async () => {
+  const { memory, file, safeStorage } = newMemory();
+  oudBestand(file, 'Zeer$Geheim1');
+  assert.equal((await memory.load()).password, 'Zeer$Geheim1', 'de asynchrone weg faalt, de synchrone leest het');
+  assert.equal(safeStorage.calls.sync, 1);
+  const opSchijf = Buffer.from(JSON.parse(fs.readFileSync(file, 'utf8')).password, 'base64').toString();
+  assert.ok(opSchijf.startsWith('async:'), 'meteen opnieuw versleuteld in het nieuwe formaat');
+  assert.equal(opSchijf.includes('Zeer$Geheim1'), false);
+  assert.equal((await memory.load()).password, 'Zeer$Geheim1');
+  assert.equal(safeStorage.calls.sync, 1, 'daarna nooit meer de synchrone weg');
+});
+
+test('een oud wachtwoord dat ook synchroon niet te lezen is, wordt gewoon opnieuw gevraagd', async () => {
+  const { memory, file } = newMemory();
+  fs.writeFileSync(file, JSON.stringify({ nick: 'Jellis', password: Buffer.from('rommel').toString('base64') }));
+  assert.equal((await memory.load()).password, '');
+});
+
+test('in Electron 46 (geen synchrone safeStorage meer) breekt een oud wachtwoord niets', async () => {
+  const { memory, file } = newMemory({ electron46: true });
+  oudBestand(file, 'x');
+  assert.deepEqual(await memory.load(), { nick: 'Jellis', password: '', autoConnect: false, passwordChoice: 'ask' });
+});
+
+test('vergeten wist nickname en wachtwoord, maar niet de voorkeur voor automatisch verbinden', async () => {
   const { memory } = newMemory();
   memory.rememberNick('Jellis');
-  memory.rememberPassword('x');
+  await memory.rememberPassword('x');
   memory.setAutoConnect(true);
   memory.setPasswordChoice('never');
   assert.deepEqual(memory.menuState(), { autoConnect: true, hasSaved: true });
   memory.forget();
-  assert.deepEqual(memory.load(), { nick: '', password: '', autoConnect: true, passwordChoice: 'ask' });
+  assert.deepEqual(await memory.load(), { nick: '', password: '', autoConnect: true, passwordChoice: 'ask' });
   assert.equal(memory.hasSaved(), false);
 });
 
-test('het menu leest de stand zonder het wachtwoord te ontsleutelen', () => {
+test('het menu leest de stand zonder het wachtwoord te ontsleutelen', async () => {
   const { memory, safeStorage } = newMemory();
-  memory.rememberPassword('x');
+  await memory.rememberPassword('x');
   const voor = safeStorage.calls.decrypt;
   memory.menuState();
   assert.equal(safeStorage.calls.decrypt, voor, 'op Linux kan ontsleutelen een KWallet-venster geven');
 });
 
-test('een kapot bestand geeft gewoon lege standaarden', () => {
+test('een kapot bestand geeft gewoon lege standaarden', async () => {
   const { memory, file } = newMemory();
   fs.writeFileSync(file, '{kapot');
-  assert.deepEqual(memory.load(), { nick: '', password: '', autoConnect: false, passwordChoice: 'ask' });
+  assert.deepEqual(await memory.load(), { nick: '', password: '', autoConnect: false, passwordChoice: 'ask' });
 });
 
 // --- het invulscript, in een nagebootst KiwiIRC-welkomstformulier (zelfde klassen als de echte pagina)

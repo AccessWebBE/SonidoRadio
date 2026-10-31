@@ -97,6 +97,19 @@ const buildContextMenuTemplate = (params = {}, login = null) => {
   return trimSeparators(items);
 };
 
+// Sinds Electron 44 geeft clipboard.writeText() een Promise terug: een mislukte kopie mag geen onafgehandelde
+// fout in het hoofdproces worden. Werkt ook met een oudere, synchrone writeText.
+const copyText = (clipboard, text) => {
+  try {
+    return Promise.resolve(clipboard.writeText(text)).catch((error) => {
+      console.error('Kopiëren naar het klembord lukte niet:', error);
+    });
+  } catch (error) {
+    console.error('Kopiëren naar het klembord lukte niet:', error);
+    return Promise.resolve();
+  }
+};
+
 const createClickHandler = (id, params, { clipboard, openExternal, login }) => {
   switch (id) {
     case 'auto-connect':
@@ -106,9 +119,9 @@ const createClickHandler = (id, params, { clipboard, openExternal, login }) => {
     case 'open-link':
       return () => openExternal(params.linkURL);
     case 'copy-link':
-      return () => clipboard.writeText(params.linkURL);
+      return () => copyText(clipboard, params.linkURL);
     case 'copy-image-address':
-      return () => clipboard.writeText(params.srcURL);
+      return () => copyText(clipboard, params.srcURL);
     default:
       return null;
   }

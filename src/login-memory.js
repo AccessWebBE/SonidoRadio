@@ -5,6 +5,12 @@
 // Electron heeft geen van beide. Deze module doet dat werk: ze bewaart wat je invulde en vult het de volgende
 // keer weer in. Het wachtwoord gaat alleen versleuteld op schijf (Electron safeStorage: Windows-account,
 // KWallet of GNOME-sleutelbos) en nooit als er op Linux geen echte sleutelbos is.
+//
+// Sinds 1.2.2 (Electron 45) de asynchrone safeStorage: de synchrone functies zijn afgeschreven en verdwijnen in
+// Electron 46. Electron zegt dat decryptStringAsync() leest wat encryptString() bewaarde, maar gemeten op 31-10-2026
+// (KWallet 6, Electron 43 → 45) klopt dat NIET: de oude versleuteling geeft een fout. Daarom één keer omzetten: lukt
+// de asynchrone weg niet, dan de (in 45 nog bestaande) synchrone, en meteen opnieuw versleutelen in het nieuwe
+// formaat. Dat kan alleen zolang Sonido op Electron 45 draait: pas naar 46+ als iedereen 1.2.2 heeft gestart.
 
 const LOGIN_HOST = 'boxy.chattersnet.nl';
 const LOGIN_PATH = '/irc-chatbox/';
@@ -43,9 +49,9 @@ const createLoginMemory = ({ file, fs, path, safeStorage, platform }) => {
 
   const update = (changes) => write({ ...read(), ...changes });
 
-  const canStorePassword = () => {
+  const canStorePassword = async () => {
     try {
-      if (!safeStorage.isEncryptionAvailable()) {
+      if (!(await safeStorage.isAsyncEncryptionAvailable())) {
         return false;
       }
       if (platform === 'linux' && typeof safeStorage.getSelectedStorageBackend === 'function') {
@@ -57,13 +63,44 @@ const createLoginMemory = ({ file, fs, path, safeStorage, platform }) => {
     }
   };
 
-  const decrypt = (encoded) => {
-    if (!encoded || !canStorePassword()) {
+  const encrypt = async (password) => (await safeStorage.encryptStringAsync(password)).toString('base64');
+
+  // Alleen om een wachtwoord van 1.2.0/1.2.1 (synchrone encryptString) om te zetten; weg zodra Electron 46 hem schrapt.
+  const decryptLegacy = (buffer) => {
+    if (typeof safeStorage.decryptString !== 'function') {
       return '';
     }
     try {
-      return safeStorage.decryptString(Buffer.from(encoded, 'base64'));
+      return safeStorage.decryptString(buffer) || '';
     } catch (_error) {
+      return '';
+    }
+  };
+
+  const decrypt = async (encoded) => {
+    if (!encoded || !(await canStorePassword())) {
+      return '';
+    }
+    const buffer = Buffer.from(encoded, 'base64');
+    const reEncrypt = async (password) => {
+      try {
+        update({ password: await encrypt(password) });
+      } catch (_error) {
+        // lukt dat niet, dan blijft de oude versleuteling staan; volgende keer opnieuw
+      }
+    };
+    try {
+      const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(buffer);
+      if (shouldReEncrypt && result) {
+        await reEncrypt(result); // de sleutel is vernieuwd: anders kan het wachtwoord later onleesbaar worden
+      }
+      return result || '';
+    } catch (_error) {
+      const oud = decryptLegacy(buffer);
+      if (oud) {
+        await reEncrypt(oud); // bewaard door 1.2.0/1.2.1: nu omzetten naar het nieuwe formaat
+        return oud;
+      }
       return ''; // ander account of andere sleutelbos: dan gewoon opnieuw invullen
     }
   };
@@ -71,11 +108,11 @@ const createLoginMemory = ({ file, fs, path, safeStorage, platform }) => {
   return {
     canStorePassword,
 
-    load() {
+    async load() {
       const data = read();
       return {
         nick: typeof data.nick === 'string' ? data.nick : '',
-        password: decrypt(data.password),
+        password: await decrypt(data.password),
         autoConnect: data.autoConnect === true,
         passwordChoice: data.passwordChoice === 'never' ? 'never' : 'ask',
       };
@@ -99,11 +136,11 @@ const createLoginMemory = ({ file, fs, path, safeStorage, platform }) => {
       }
     },
 
-    rememberPassword(password) {
-      if (!password || !canStorePassword()) {
+    async rememberPassword(password) {
+      if (!password || !(await canStorePassword())) {
         return false;
       }
-      update({ password: safeStorage.encryptString(password).toString('base64'), passwordChoice: 'ask' });
+      update({ password: await encrypt(password), passwordChoice: 'ask' });
       return true;
     },
 

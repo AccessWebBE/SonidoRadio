@@ -139,16 +139,16 @@ const handleLogin = async (window, result) => {
   }
   const memory = getLoginMemory();
   memory.rememberNick(result.nick);
-  if (!result.password || !memory.canStorePassword() || window.isDestroyed()) {
+  if (!result.password || !(await memory.canStorePassword()) || window.isDestroyed()) {
     return;
   }
-  const saved = memory.load();
+  const saved = await memory.load();
   if (saved.password === result.password || saved.passwordChoice === 'never') {
     return;
   }
   const response = await askToRememberPassword(window, result.nick, Boolean(saved.password));
   if (response === 0) {
-    memory.rememberPassword(result.password);
+    await memory.rememberPassword(result.password);
   } else if (response === 2) {
     memory.setPasswordChoice('never');
   }
@@ -165,8 +165,9 @@ const configureLoginMemory = (window) => {
     if (!frame || !isLoginFrameUrl(frame.url)) {
       return;
     }
-    frame
-      .executeJavaScript(buildLoginScript(getLoginMemory().load()))
+    getLoginMemory()
+      .load()
+      .then((saved) => frame.executeJavaScript(buildLoginScript(saved)))
       .then((result) => handleLogin(window, result))
       .catch((error) => {
         // bewust zonder de foutmelding zelf: het script bevat eventueel het wachtwoord

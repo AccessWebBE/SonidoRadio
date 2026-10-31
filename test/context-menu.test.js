@@ -133,3 +133,34 @@ test('de aanmelditems roepen de juiste acties aan', () => {
   items.find((i) => i.label === 'Opgeslagen nickname en wachtwoord vergeten').click();
   assert.deepEqual(gedaan, [['auto', true], ['vergeten']]);
 });
+
+test('kopiëren werkt met de asynchrone clipboard van Electron 44+, ook als het mislukt', async () => {
+  const params = { linkURL: 'https://www.sonidoradio.nl', editFlags: {} };
+  const gekopieerd = [];
+  const goed = toMenuItems(buildContextMenuTemplate(params), params, {
+    clipboard: { writeText: async (value) => { gekopieerd.push(value); } },
+    openExternal: () => {},
+  });
+  await goed.find((item) => item.label === 'Linkadres kopiëren').click();
+  assert.deepEqual(gekopieerd, ['https://www.sonidoradio.nl']);
+
+  const fouten = [];
+  const origineel = console.error;
+  console.error = (...args) => fouten.push(args.join(' '));
+  try {
+    const mislukt = toMenuItems(buildContextMenuTemplate(params), params, {
+      clipboard: { writeText: () => Promise.reject(new Error('klembord bezet')) },
+      openExternal: () => {},
+    });
+    // geen onafgehandelde afwijzing: de klik geeft een Promise die gewoon afloopt
+    await mislukt.find((item) => item.label === 'Linkadres kopiëren').click();
+    const gooit = toMenuItems(buildContextMenuTemplate(params), params, {
+      clipboard: { writeText: () => { throw new Error('klembord weg'); } },
+      openExternal: () => {},
+    });
+    await gooit.find((item) => item.label === 'Linkadres kopiëren').click();
+  } finally {
+    console.error = origineel;
+  }
+  assert.equal(fouten.length, 2, 'beide mislukkingen worden gelogd, niet doorgegooid');
+});
