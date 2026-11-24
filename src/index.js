@@ -13,6 +13,7 @@ const {
 const { configureContextMenu } = require('./context-menu');
 const { buildLoginScript, createLoginMemory, isLoginFrameUrl } = require('./login-memory');
 const { buildVolumeScript, isPlayerPageUrl } = require('./player-volume');
+const { STATE_FILE, clearStaleContent, createCacheState, reasonToClear } = require('./fresh-content');
 const { createRevealScheduler } = require('./reveal');
 const { configureAutoUpdates } = require('./updater');
 
@@ -292,6 +293,7 @@ const createWindow = () => {
       setAutoConnect: (value) => getLoginMemory().setAutoConnect(value),
       forget: () => getLoginMemory().forget(),
     },
+    reloadChat: () => reloadChat(window),
   });
   configureLoginMemory(window);
   configurePlayerVolume(window);
@@ -330,9 +332,50 @@ const createWindow = () => {
     }
   });
 
+  // Na een update van Sonido of na lang niet openen eerst de oude cache weg, anders gewoon laden (fresh-content.js).
+  const cacheState = createCacheState({ file: path.join(app.getPath('userData'), STATE_FILE), fs, path });
+  const reason = reasonToClear(cacheState.read(), { version: app.getVersion(), now: Date.now() });
+  const remember = () => cacheState.write(app.getVersion(), Date.now());
+  remember();
+  window.on('close', remember); // "lang niet geopend" telt vanaf het sluiten, niet vanaf de start
+  if (reason) {
+    loadFreshChat(window, { reason });
+  } else {
+    loadChat(window);
+  }
+};
+
+const loadChat = (window, { reload = false } = {}) => {
+  if (window.isDestroyed()) {
+    return;
+  }
+  showingConnectionError = false;
+  if (reload && isAllowedChatUrl(window.webContents.getURL())) {
+    // opnieuw laden zonder enige cache, ook niet die in het geheugen van de pagina zelf
+    window.webContents.reloadIgnoringCache();
+    return;
+  }
   window.loadURL(CHAT_URL).catch(() => {
     void showConnectionError(window);
   });
+};
+
+const loadFreshChat = (window, { reload = false, reason = 'herladen' } = {}) => {
+  clearStaleContent(window.webContents.session, log)
+    .then(({ cacheBytes, cleared }) => {
+      if (cleared) {
+        log.info(`Cache van de chat geleegd: ${reason} (${Math.round((cacheBytes || 0) / 1024)} kB)`);
+      }
+    })
+    .finally(() => loadChat(window, { reload }));
+};
+
+// Rechtsklik → "Chat herladen (nieuwste versie)": voor wie Sonido dagen open laat staan. Laadt altijd de chatpagina
+// zelf, ook vanaf de foutpagina na een verbindingsprobleem.
+const reloadChat = (window) => {
+  if (!window.isDestroyed()) {
+    loadFreshChat(window, { reload: true, reason: 'chat herladen via rechtsklik' });
+  }
 };
 
 const focusMainWindow = () => {

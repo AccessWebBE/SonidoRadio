@@ -164,3 +164,18 @@ test('kopiëren werkt met de asynchrone clipboard van Electron 44+, ook als het 
   }
   assert.equal(fouten.length, 2, 'beide mislukkingen worden gelogd, niet doorgegooid');
 });
+
+test('"Chat herladen (nieuwste versie)" staat onderaan en roept de herlaadfunctie aan', () => {
+  const params = { editFlags: {} };
+  const zonder = buildContextMenuTemplate(params, null);
+  assert.equal(zonder.some((item) => item.id === 'reload-chat'), false, 'zonder herlaadfunctie geen item');
+
+  const met = buildContextMenuTemplate(params, { autoConnect: false, hasSaved: false }, { reload: true });
+  assert.equal(met[met.length - 1].id, 'reload-chat');
+  assert.equal(met[met.length - 2].type, 'separator');
+
+  let herladen = 0;
+  const items = toMenuItems(met, params, { clipboard: {}, openExternal: () => {}, reloadChat: () => { herladen += 1; } });
+  items.find((item) => item.label === 'Chat herladen (nieuwste versie)').click();
+  assert.equal(herladen, 1);
+});

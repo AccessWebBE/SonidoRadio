@@ -72,6 +72,9 @@ Nee. Sonido onthoudt je nickname en vult hem de volgende keer zelf in. Gebruik j
 **Onthoudt Sonido het volume van de radio?**
 Ja. Het volume dat je in de speler instelt, staat bij de volgende start weer zo. Dempen onthoudt Sonido bewust niet, anders start de radio de volgende keer zonder geluid.
 
+**Ik zie nog een oude versie van de chat. Wat nu?**
+Na een update van Sonido, of als je Sonido een week niet geopend hebt, haalt Sonido de chat altijd volledig opnieuw op. Laat je Sonido dagen openstaan, dan toont de chat zelf een knop "Er is een nieuwe versie beschikbaar". Je kunt ook rechtsklikken en **Chat herladen (nieuwste versie)** kiezen. Je instellingen, nickname en volume blijven daarbij bewaard.
+
 **Hoe krijg ik updates?**
 Sonido controleert automatisch op nieuwe officiële releases, een paar seconden na het opstarten. Terwijl de update binnenkomt zie je de voortgang in je taakbalk. Zodra ze klaarstaat, kun je meteen herstarten of ze automatisch laten installeren wanneer je de app afsluit. De gewone Windows-installer werkt ook als upgrade en behoudt je bestaande installatie.
 

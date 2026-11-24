@@ -24,7 +24,8 @@ const trimSeparators = (items) => {
 };
 
 // login: { autoConnect, hasSaved } — de onthouden aanmeldgegevens (zie login-memory.js); weglaten = geen items.
-const buildContextMenuTemplate = (params = {}, login = null) => {
+// options.reload: toon "Chat herladen (nieuwste versie)" (sinds 1.2.3).
+const buildContextMenuTemplate = (params = {}, login = null, options = {}) => {
   const editFlags = params.editFlags || {};
   const hasSelection = Boolean((params.selectionText || '').trim());
   const items = [];
@@ -94,6 +95,10 @@ const buildContextMenuTemplate = (params = {}, login = null) => {
     );
   }
 
+  if (options.reload) {
+    items.push(SEPARATOR, { id: 'reload-chat', label: 'Chat herladen (nieuwste versie)' });
+  }
+
   return trimSeparators(items);
 };
 
@@ -110,8 +115,10 @@ const copyText = (clipboard, text) => {
   }
 };
 
-const createClickHandler = (id, params, { clipboard, openExternal, login }) => {
+const createClickHandler = (id, params, { clipboard, openExternal, login, reloadChat }) => {
   switch (id) {
+    case 'reload-chat':
+      return reloadChat ? () => reloadChat() : null;
     case 'auto-connect':
       return login ? (menuItem) => login.setAutoConnect(menuItem.checked) : null;
     case 'forget-login':
@@ -127,29 +134,30 @@ const createClickHandler = (id, params, { clipboard, openExternal, login }) => {
   }
 };
 
-const toMenuItems = (template, params, { clipboard, openExternal, login }) =>
+const toMenuItems = (template, params, { clipboard, openExternal, login, reloadChat }) =>
   template.map((item) => {
     if (item.type === 'separator') {
       return { type: 'separator' };
     }
 
     const { id, ...menuItem } = item;
-    const click = createClickHandler(id, params, { clipboard, openExternal, login });
+    const click = createClickHandler(id, params, { clipboard, openExternal, login, reloadChat });
     return click ? { ...menuItem, click } : menuItem;
   });
 
 // login (optioneel): { getState() → { autoConnect, hasSaved }, setAutoConnect(bool), forget() }
-const configureContextMenu = (window, { Menu, clipboard, openExternal, login }) => {
+// reloadChat (optioneel): () → cache legen en de chat opnieuw laden
+const configureContextMenu = (window, { Menu, clipboard, openExternal, login, reloadChat }) => {
   window.webContents.on('context-menu', (_event, params) => {
     if (window.isDestroyed()) {
       return;
     }
 
-    const template = toMenuItems(buildContextMenuTemplate(params, login ? login.getState() : null), params, {
-      clipboard,
-      openExternal,
-      login,
-    });
+    const template = toMenuItems(
+      buildContextMenuTemplate(params, login ? login.getState() : null, { reload: Boolean(reloadChat) }),
+      params,
+      { clipboard, openExternal, login, reloadChat },
+    );
 
     if (template.length === 0) {
       return;
